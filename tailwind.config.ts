@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,13 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				audio: {
+					primary: '#8B5CF6',
+					secondary: '#7E69AB',
+					dark: '#1A1F2C',
+					light: '#E5DEFF',
+					muted: '#9F9EA1'
 				}
 			},
 			borderRadius: {
@@ -70,25 +78,31 @@ export default {
 			},
 			keyframes: {
 				'accordion-down': {
-					from: {
-						height: '0'
-					},
-					to: {
-						height: 'var(--radix-accordion-content-height)'
-					}
+					from: { height: '0' },
+					to: { height: 'var(--radix-accordion-content-height)' }
 				},
 				'accordion-up': {
-					from: {
-						height: 'var(--radix-accordion-content-height)'
-					},
-					to: {
-						height: '0'
-					}
+					from: { height: 'var(--radix-accordion-content-height)' },
+					to: { height: '0' }
+				},
+				'pulse-audio': {
+					'0%, 100%': { opacity: '0.6', transform: 'scale(0.9)' },
+					'50%': { opacity: '1', transform: 'scale(1)' }
+				},
+				'wave': {
+					'0%': { transform: 'scaleY(0.3)' },
+					'50%': { transform: 'scaleY(1)' },
+					'100%': { transform: 'scaleY(0.3)' }
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'pulse-audio': 'pulse-audio 2s ease-in-out infinite',
+				'wave-1': 'wave 1.2s linear infinite',
+				'wave-2': 'wave 1.2s linear infinite 0.2s',
+				'wave-3': 'wave 1.2s linear infinite 0.4s',
+				'wave-4': 'wave 1.2s linear infinite 0.6s'
 			}
 		}
 	},
