@@ -318,6 +318,43 @@ export function useWebRTC() {
     }
   }, [currentBroadcaster, initializeWebRTC, isBroadcasting, isListening]);
   
+  // const leaveBroadcast = useCallback(async () => {
+  //   if (!isListening || !currentBroadcaster) return false;
+    
+  //   try {
+  //     const webRTC = initializeWebRTC();
+  //     await webRTC.leaveBroadcast(currentBroadcaster);
+      
+  //     setIsListening(false);
+  //     setCurrentBroadcaster(null);
+  //     setCurrentRoomId(null);
+      
+  //     toast({
+  //       title: "Left broadcast",
+  //       description: "You are no longer listening",
+  //     });
+      
+  //     console.log("Left broadcast");
+  //     return true;
+  //   } catch (error) {
+  //     console.error("Error leaving broadcast:", error);
+  //     toast({
+  //       title: "Error",
+  //       description: "Failed to leave broadcast",
+  //       variant: "destructive",
+  //     });
+  //     return false;
+  //   }
+  // }, [currentBroadcaster, initializeWebRTC, isListening]);
+  
+  const currentUser: Contact = {
+    id: userId,
+    name: username,
+    phoneNumber: phoneNumber,
+    isBroadcasting,
+    listeners: []
+  };
+  
   const leaveBroadcast = useCallback(async () => {
     if (!isListening || !currentBroadcaster) return false;
     
@@ -346,15 +383,7 @@ export function useWebRTC() {
       return false;
     }
   }, [currentBroadcaster, initializeWebRTC, isListening]);
-  
-  const currentUser: Contact = {
-    id: userId,
-    name: username,
-    phoneNumber: phoneNumber,
-    isBroadcasting,
-    listeners: []
-  };
-  
+
   // Cleanup function for component unmount
   useEffect(() => {
     return () => {
