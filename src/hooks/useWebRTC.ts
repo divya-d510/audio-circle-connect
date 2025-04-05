@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,30 +14,24 @@ export function useWebRTC() {
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   
-  // Generate a fake user ID for demo purposes (in a real app, this would come from auth)
   const userId = useState(() => uuidv4())[0];
   const username = useState(() => `User-${userId.substring(0, 5)}`)[0];
   
-  // Function to initialize the WebRTC service
   const initializeWebRTC = useCallback((): WebRTCService => {
     const service = getWebRTCService(userId, username);
     
-    // Set up callbacks
     service.setOnListenerConnected((listenerId) => {
       console.log(`Listener connected: ${listenerId}`);
-      // Update listeners for the broadcaster in real-time
       fetchCurrentBroadcastListeners();
     });
     
     service.setOnListenerDisconnected((listenerId) => {
       console.log(`Listener disconnected: ${listenerId}`);
-      // Update listeners for the broadcaster in real-time
       fetchCurrentBroadcastListeners();
     });
     
     service.setOnBroadcasterStream((broadcasterId, stream) => {
       console.log(`Got stream from broadcaster: ${broadcasterId}`);
-      // Create an audio element to play the stream
       const audioElement = new Audio();
       audioElement.srcObject = stream;
       audioElement.autoplay = true;
@@ -47,7 +40,6 @@ export function useWebRTC() {
     return service;
   }, [userId, username]);
   
-  // Fetch all active broadcasts
   const fetchActiveBroadcasts = useCallback(async () => {
     try {
       const { data: broadcasts } = await supabase
@@ -57,7 +49,6 @@ export function useWebRTC() {
       
       if (!broadcasts) return [];
       
-      // Transform broadcasts to Contact objects
       const contactsData: Contact[] = broadcasts.map((broadcast: Broadcast) => ({
         id: broadcast.user_id,
         name: broadcast.username,
@@ -66,7 +57,6 @@ export function useWebRTC() {
         roomId: broadcast.room_id
       }));
       
-      // Fetch listeners for each broadcast
       for (const contact of contactsData) {
         const { data: listeners } = await supabase
           .from('listeners')
@@ -81,7 +71,6 @@ export function useWebRTC() {
         }
       }
       
-      // Filter out the current user
       const filteredContacts = contactsData.filter(contact => contact.id !== userId);
       setContacts(filteredContacts);
       return filteredContacts;
@@ -91,7 +80,6 @@ export function useWebRTC() {
     }
   }, [userId]);
   
-  // Fetch listeners for the current broadcast
   const fetchCurrentBroadcastListeners = useCallback(async () => {
     if (!isBroadcasting) return;
     
@@ -107,7 +95,6 @@ export function useWebRTC() {
           name: listener.username
         }));
         
-        // Update the currentUser's listeners
         setContacts(prev => {
           const updatedContacts = [...prev];
           return updatedContacts;
@@ -118,12 +105,9 @@ export function useWebRTC() {
     }
   }, [isBroadcasting, userId]);
   
-  // Subscribe to realtime updates for broadcasts and listeners
   useEffect(() => {
-    // Initial fetch of broadcasts
     fetchActiveBroadcasts();
     
-    // Set up subscriptions for realtime updates
     const broadcastsChannel = supabase
       .channel('broadcasts-changes')
       .on('postgres_changes', {
@@ -155,7 +139,6 @@ export function useWebRTC() {
     };
   }, [fetchActiveBroadcasts, fetchCurrentBroadcastListeners, isBroadcasting]);
   
-  // Start broadcasting
   const startBroadcast = useCallback(async () => {
     try {
       const webRTC = initializeWebRTC();
@@ -164,7 +147,6 @@ export function useWebRTC() {
       if (stream) {
         setIsBroadcasting(true);
         
-        // Create an audio context for visualizations if needed
         const context = new AudioContext();
         setAudioContext(context);
         
@@ -194,7 +176,6 @@ export function useWebRTC() {
     }
   }, [initializeWebRTC]);
   
-  // Stop broadcasting
   const stopBroadcast = useCallback(async () => {
     try {
       const webRTC = initializeWebRTC();
@@ -202,7 +183,6 @@ export function useWebRTC() {
       
       setIsBroadcasting(false);
       
-      // Clean up audio context
       if (audioContext) {
         audioContext.close();
         setAudioContext(null);
@@ -226,7 +206,6 @@ export function useWebRTC() {
     }
   }, [audioContext, initializeWebRTC]);
   
-  // Toggle broadcasting state
   const toggleBroadcast = useCallback(async () => {
     if (isBroadcasting) {
       return await stopBroadcast();
@@ -235,20 +214,16 @@ export function useWebRTC() {
     }
   }, [isBroadcasting, startBroadcast, stopBroadcast]);
   
-  // Join a broadcast
   const joinBroadcast = useCallback(async (contactId: string, contactName: string, roomId: string) => {
     try {
-      // Don't join if already listening or broadcasting
       if (isListening || isBroadcasting) {
         if (isListening && currentBroadcaster === contactId) {
-          // Already listening to this broadcast
           toast({
             title: "Already listening",
             description: `You are already listening to ${contactName}`,
           });
           return false;
         } else if (isListening) {
-          // Leave current broadcast first
           await leaveBroadcast();
         } else {
           toast({
@@ -285,7 +260,6 @@ export function useWebRTC() {
     }
   }, [currentBroadcaster, initializeWebRTC, isBroadcasting, isListening]);
   
-  // Leave a broadcast
   const leaveBroadcast = useCallback(async () => {
     if (!isListening || !currentBroadcaster) return false;
     
@@ -315,7 +289,6 @@ export function useWebRTC() {
     }
   }, [currentBroadcaster, initializeWebRTC, isListening]);
   
-  // Current user object
   const currentUser: Contact = {
     id: userId,
     name: username,
@@ -323,14 +296,12 @@ export function useWebRTC() {
     listeners: []
   };
   
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (audioContext) {
         audioContext.close();
       }
       
-      // Stop all WebRTC connections when component is unmounted
       if (isBroadcasting || isListening) {
         const webRTC = initializeWebRTC();
         if (isBroadcasting) {

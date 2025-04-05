@@ -1,4 +1,5 @@
 
+
 export interface Room {
   id: string;
   name: string;
@@ -35,6 +36,8 @@ export interface ListenerRecord {
 }
 
 // Extended Contact type that includes WebRTC connection info
+import { Contact } from './contact';
+
 export interface WebRTCContact extends Contact {
   peerConnection?: RTCPeerConnection;
   mediaStream?: MediaStream;

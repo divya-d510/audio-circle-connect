@@ -21,6 +21,8 @@ const Index = () => {
     const contact = contacts.find(c => c.id === contactId);
     if (contact && contact.roomId) {
       joinBroadcast(contactId, contact.name, contact.roomId);
+    } else {
+      console.error('Cannot join broadcast: missing roomId');
     }
   };
 

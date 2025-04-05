@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { WebRTCSignal, Room } from "@/types/supabase";
 import { v4 as uuidv4 } from "uuid";
@@ -196,25 +195,34 @@ export class WebRTCService {
 
   // Create or get a room for broadcasting
   private async getOrCreateRoom(): Promise<string> {
-    // Check if user already has a room
-    const { data: existingRooms } = await supabase
-      .from('broadcasts')
-      .select('room_id')
-      .eq('user_id', this.userId)
-      .eq('active', true);
-    
-    if (existingRooms && existingRooms.length > 0) {
-      return existingRooms[0].room_id;
+    try {
+      // Check if user already has a room
+      const { data: existingRooms } = await supabase
+        .from('broadcasts')
+        .select('room_id')
+        .eq('user_id', this.userId)
+        .eq('active', true);
+      
+      if (existingRooms && existingRooms.length > 0) {
+        return existingRooms[0].room_id;
+      }
+      
+      // Create a new room
+      const { data: newRoom, error } = await supabase
+        .from('rooms')
+        .insert({ name: `${this.username}'s Room` })
+        .select()
+        .single();
+      
+      if (error || !newRoom) {
+        throw new Error('Failed to create room');
+      }
+      
+      return newRoom.id;
+    } catch (error) {
+      console.error('Error getting or creating room:', error);
+      throw error;
     }
-    
-    // Create a new room
-    const { data: newRoom } = await supabase
-      .from('rooms')
-      .insert({ name: `${this.username}'s Room` })
-      .select()
-      .single();
-    
-    return newRoom.id;
   }
 
   // Set up WebRTC signaling listener
