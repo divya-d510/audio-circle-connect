@@ -1,5 +1,5 @@
 
-interface Database {
+export interface Database {
   public: {
     Tables: {
       broadcasts: {
@@ -104,7 +104,9 @@ interface Database {
         };
       };
     };
+    Views: {};
+    Functions: {};
+    Enums: {};
+    CompositeTypes: {};
   };
 }
-
-export {};

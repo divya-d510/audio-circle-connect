@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { WebRTCSignal, Room } from "@/types/supabase";
 import { v4 as uuidv4 } from "uuid";
@@ -61,19 +62,28 @@ export class WebRTCService {
       const roomId = await this.getOrCreateRoom();
       this.roomId = roomId;
 
-      // Get audio stream from user's microphone
+      // Get audio stream from user's microphone with optimized audio settings
       this.localStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        },
         video: false,
       });
 
       // Register as broadcaster in Supabase
-      await supabase.from('broadcasts').upsert({
-        user_id: this.userId,
-        username: this.username,
-        room_id: this.roomId,
-        active: true,
-      });
+      try {
+        await supabase.from('broadcasts').upsert({
+          user_id: this.userId,
+          username: this.username,
+          room_id: this.roomId,
+          active: true,
+        });
+      } catch (error) {
+        console.error('Error registering as broadcaster:', error);
+        throw new Error('Failed to register as broadcaster');
+      }
 
       // Set up listener for incoming connection requests
       await this.setupSignalingListener();
@@ -102,11 +112,15 @@ export class WebRTCService {
 
       // Update broadcast status in Supabase
       if (this.roomId) {
-        await supabase
-          .from('broadcasts')
-          .update({ active: false })
-          .eq('user_id', this.userId)
-          .eq('room_id', this.roomId);
+        try {
+          await supabase
+            .from('broadcasts')
+            .update({ active: false })
+            .eq('user_id', this.userId)
+            .eq('room_id', this.roomId);
+        } catch (error) {
+          console.error('Error updating broadcast status:', error);
+        }
       }
     } catch (error) {
       console.error('Error stopping broadcast:', error);
@@ -124,11 +138,15 @@ export class WebRTCService {
       
       // Set up event handlers for the peer connection
       peerConnection.ontrack = (event) => {
+        console.log("Received track from broadcaster:", event);
         if (event.streams && event.streams[0]) {
           this.remoteStreams.set(broadcasterId, event.streams[0]);
+          console.log("Setting remote stream with tracks:", event.streams[0].getTracks().length);
           if (this.onBroadcasterStreamCallback) {
             this.onBroadcasterStreamCallback(broadcasterId, event.streams[0]);
           }
+        } else {
+          console.warn("Received track event but no streams available");
         }
       };
 
@@ -137,14 +155,28 @@ export class WebRTCService {
           this.sendSignal(broadcasterId, 'ice-candidate', event.candidate);
         }
       };
+      
+      // Log connection state changes
+      peerConnection.onconnectionstatechange = () => {
+        console.log("Connection state change:", peerConnection.connectionState);
+      };
+      
+      peerConnection.oniceconnectionstatechange = () => {
+        console.log("ICE connection state change:", peerConnection.iceConnectionState);
+      };
 
       // Register as listener in Supabase
-      await supabase.from('listeners').upsert({
-        user_id: this.userId,
-        username: this.username,
-        broadcaster_id: broadcasterId,
-        room_id: this.roomId,
-      });
+      try {
+        await supabase.from('listeners').upsert({
+          user_id: this.userId,
+          username: this.username,
+          broadcaster_id: broadcasterId,
+          room_id: this.roomId,
+        });
+      } catch (error) {
+        console.error('Error registering as listener:', error);
+        throw new Error('Failed to register as listener');
+      }
 
       // Send offer to broadcaster
       const offer = await peerConnection.createOffer();
@@ -156,6 +188,7 @@ export class WebRTCService {
 
     } catch (error) {
       console.error('Error joining broadcast:', error);
+      throw error;
     }
   }
 
@@ -176,12 +209,15 @@ export class WebRTCService {
 
       // Remove from listeners table in Supabase
       if (this.roomId) {
-        await supabase
-          .from('listeners')
-          .delete()
-          .eq('user_id', this.userId)
-          .eq('broadcaster_id', broadcasterId)
-          .eq('room_id', this.roomId);
+        try {
+          await supabase
+            .from('listeners')
+            .delete()
+            .eq('user_id', this.userId)
+            .eq('broadcaster_id', broadcasterId);
+        } catch (error) {
+          console.error('Error removing listener record:', error);
+        }
       }
     } catch (error) {
       console.error('Error leaving broadcast:', error);
@@ -197,28 +233,37 @@ export class WebRTCService {
   private async getOrCreateRoom(): Promise<string> {
     try {
       // Check if user already has a room
-      const { data: existingRooms } = await supabase
-        .from('broadcasts')
-        .select('room_id')
-        .eq('user_id', this.userId)
-        .eq('active', true);
-      
-      if (existingRooms && existingRooms.length > 0) {
-        return existingRooms[0].room_id;
+      try {
+        const { data: existingRooms } = await supabase
+          .from('broadcasts')
+          .select('room_id')
+          .eq('user_id', this.userId)
+          .eq('active', true);
+        
+        if (existingRooms && existingRooms.length > 0 && existingRooms[0].room_id) {
+          return existingRooms[0].room_id;
+        }
+      } catch (error) {
+        console.error('Error checking for existing rooms:', error);
       }
       
       // Create a new room
-      const { data: newRoom, error } = await supabase
-        .from('rooms')
-        .insert({ name: `${this.username}'s Room` })
-        .select()
-        .single();
-      
-      if (error || !newRoom) {
-        throw new Error('Failed to create room');
+      try {
+        const { data: newRoom, error } = await supabase
+          .from('rooms')
+          .insert({ name: `${this.username}'s Room` })
+          .select()
+          .single();
+        
+        if (error || !newRoom) {
+          throw new Error('Failed to create room');
+        }
+        
+        return newRoom.id;
+      } catch (error) {
+        console.error('Error creating new room:', error);
+        throw error;
       }
-      
-      return newRoom.id;
     } catch (error) {
       console.error('Error getting or creating room:', error);
       throw error;
@@ -227,28 +272,36 @@ export class WebRTCService {
 
   // Set up WebRTC signaling listener
   private async setupSignalingListener(): Promise<void> {
-    const channel = supabase
-      .channel(`webrtc-signals-${this.userId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'webrtc_signals',
-        filter: `receiver_id=eq.${this.userId}`
-      }, (payload) => {
-        this.handleSignalingMessage(payload.new as WebRTCSignal);
-      })
-      .subscribe();
+    try {
+      const channel = supabase
+        .channel(`webrtc-signals-${this.userId}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'webrtc_signals',
+          filter: `receiver_id=eq.${this.userId}`
+        }, (payload) => {
+          this.handleSignalingMessage(payload.new as WebRTCSignal);
+        })
+        .subscribe();
+    } catch (error) {
+      console.error('Error setting up signaling listener:', error);
+    }
   }
 
   // Send a WebRTC signal through Supabase
   private async sendSignal(receiverId: string, type: string, data: any): Promise<void> {
-    await supabase.from('webrtc_signals').insert({
-      room_id: this.roomId,
-      sender_id: this.userId,
-      receiver_id: receiverId,
-      type,
-      data,
-    });
+    try {
+      await supabase.from('webrtc_signals').insert({
+        room_id: this.roomId,
+        sender_id: this.userId,
+        receiver_id: receiverId,
+        type,
+        data,
+      });
+    } catch (error) {
+      console.error('Error sending signal:', error);
+    }
   }
 
   // Handle incoming WebRTC signals
@@ -265,7 +318,10 @@ export class WebRTCService {
         // Add local stream tracks to the connection if we're broadcasting
         if (this.localStream) {
           this.localStream.getTracks().forEach(track => {
-            this.localStream && peerConnection.addTrack(track, this.localStream);
+            if (this.localStream) {
+              console.log("Adding local track to peer connection:", track.kind);
+              peerConnection.addTrack(track, this.localStream);
+            }
           });
         }
         
@@ -276,6 +332,7 @@ export class WebRTCService {
         };
         
         peerConnection.ontrack = (event) => {
+          console.log("Received track in signal handler:", event);
           if (event.streams && event.streams[0]) {
             this.remoteStreams.set(sender_id, event.streams[0]);
             if (this.onBroadcasterStreamCallback) {
@@ -283,11 +340,21 @@ export class WebRTCService {
             }
           }
         };
+        
+        // Log connection state changes
+        peerConnection.onconnectionstatechange = () => {
+          console.log("Connection state change:", peerConnection.connectionState);
+        };
+        
+        peerConnection.oniceconnectionstatechange = () => {
+          console.log("ICE connection state change:", peerConnection.iceConnectionState);
+        };
       }
       
       // Process the signaling message based on its type
       switch (type) {
         case 'offer':
+          console.log("Processing offer from:", sender_id);
           await peerConnection.setRemoteDescription(new RTCSessionDescription(data));
           const answer = await peerConnection.createAnswer();
           await peerConnection.setLocalDescription(answer);
@@ -300,10 +367,12 @@ export class WebRTCService {
           break;
           
         case 'answer':
+          console.log("Processing answer from:", sender_id);
           await peerConnection.setRemoteDescription(new RTCSessionDescription(data));
           break;
           
         case 'ice-candidate':
+          console.log("Processing ICE candidate from:", sender_id);
           await peerConnection.addIceCandidate(new RTCIceCandidate(data));
           break;
           

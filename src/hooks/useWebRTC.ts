@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,8 +15,14 @@ export function useWebRTC() {
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   
+  // Generate a mock phone number for demo purposes
+  const generatePhoneNumber = () => {
+    return `+1${Math.floor(Math.random() * 900 + 100)}${Math.floor(Math.random() * 9000 + 1000)}`;
+  };
+  
   const userId = useState(() => uuidv4())[0];
   const username = useState(() => `User-${userId.substring(0, 5)}`)[0];
+  const phoneNumber = useState(() => generatePhoneNumber())[0];
   
   const initializeWebRTC = useCallback((): WebRTCService => {
     const service = getWebRTCService(userId, username);
@@ -31,10 +38,39 @@ export function useWebRTC() {
     });
     
     service.setOnBroadcasterStream((broadcasterId, stream) => {
-      console.log(`Got stream from broadcaster: ${broadcasterId}`);
+      console.log(`Got stream from broadcaster: ${broadcasterId}`, stream);
+      
+      // Create audio element and play it
       const audioElement = new Audio();
       audioElement.srcObject = stream;
       audioElement.autoplay = true;
+      
+      // Make sure audio is unmuted and volume is up
+      audioElement.muted = false;
+      audioElement.volume = 1.0;
+      
+      // Force audio play (sometimes needed on mobile)
+      const playPromise = audioElement.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('Audio playback started successfully');
+          })
+          .catch(error => {
+            console.error('Audio playback was prevented:', error);
+            // Try again after user interaction
+            const userInteracted = () => {
+              audioElement.play();
+              document.removeEventListener('click', userInteracted);
+            };
+            document.addEventListener('click', userInteracted);
+            
+            toast({
+              title: "Audio playback issue",
+              description: "Please click anywhere on the screen to enable audio",
+            });
+          });
+      }
     });
     
     return service;
@@ -105,6 +141,7 @@ export function useWebRTC() {
     }
   }, [isBroadcasting, userId]);
   
+  // Set up listeners for broadcast changes
   useEffect(() => {
     fetchActiveBroadcasts();
     
@@ -114,8 +151,23 @@ export function useWebRTC() {
         event: '*',
         schema: 'public',
         table: 'broadcasts'
-      }, () => {
+      }, (payload) => {
+        console.log('Broadcast change detected:', payload);
         fetchActiveBroadcasts();
+        
+        // If a broadcast ends and we're listening to it, automatically leave
+        if (isListening && 
+            currentBroadcaster && 
+            payload.eventType === 'UPDATE' && 
+            payload.new && 
+            !payload.new.active && 
+            payload.new.user_id === currentBroadcaster) {
+          leaveBroadcast();
+          toast({
+            title: "Broadcast ended",
+            description: "The broadcaster has ended their stream",
+          });
+        }
       })
       .subscribe();
       
@@ -137,7 +189,7 @@ export function useWebRTC() {
       supabase.removeChannel(broadcastsChannel);
       supabase.removeChannel(listenersChannel);
     };
-  }, [fetchActiveBroadcasts, fetchCurrentBroadcastListeners, isBroadcasting]);
+  }, [fetchActiveBroadcasts, fetchCurrentBroadcastListeners, isBroadcasting, isListening, currentBroadcaster, leaveBroadcast]);
   
   const startBroadcast = useCallback(async () => {
     try {
@@ -216,23 +268,29 @@ export function useWebRTC() {
   
   const joinBroadcast = useCallback(async (contactId: string, contactName: string, roomId: string) => {
     try {
-      if (isListening || isBroadcasting) {
-        if (isListening && currentBroadcaster === contactId) {
+      // Prevent joining if already broadcasting
+      if (isBroadcasting) {
+        toast({
+          title: "Cannot join",
+          description: "You cannot listen while broadcasting",
+          variant: "destructive",
+        });
+        return false;
+      }
+      
+      // If already listening to someone, leave first
+      if (isListening && currentBroadcaster) {
+        // If trying to join the same broadcast, do nothing
+        if (currentBroadcaster === contactId) {
           toast({
             title: "Already listening",
             description: `You are already listening to ${contactName}`,
           });
           return false;
-        } else if (isListening) {
-          await leaveBroadcast();
-        } else {
-          toast({
-            title: "Cannot join",
-            description: "You cannot listen while broadcasting",
-            variant: "destructive",
-          });
-          return false;
         }
+        
+        // Leave current broadcast before joining a new one
+        await leaveBroadcast();
       }
       
       const webRTC = initializeWebRTC();
@@ -292,10 +350,12 @@ export function useWebRTC() {
   const currentUser: Contact = {
     id: userId,
     name: username,
+    phoneNumber: phoneNumber,
     isBroadcasting,
     listeners: []
   };
   
+  // Cleanup function for component unmount
   useEffect(() => {
     return () => {
       if (audioContext) {

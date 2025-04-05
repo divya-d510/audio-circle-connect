@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, Headphones, Mic, MicOff, User, Volume, Volume2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Headphones, Mic, MicOff, User, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -60,11 +60,18 @@ const ContactCard: React.FC<ContactCardProps> = ({
                 <span className="font-medium text-lg">{contact.name}</span>
                 {contact.isBroadcasting && <AudioWaveAnimation isActive={true} />}
               </div>
-              <span className="text-sm text-muted-foreground">
-                {contact.isBroadcasting 
-                  ? `Broadcasting to ${contact.listeners?.length || 0} listener${contact.listeners?.length !== 1 ? 's' : ''}` 
-                  : 'Not broadcasting'}
-              </span>
+              <div className="flex flex-col gap-1">
+                <span className="text-sm text-muted-foreground">
+                  {contact.isBroadcasting 
+                    ? `Broadcasting to ${contact.listeners?.length || 0} listener${contact.listeners?.length !== 1 ? 's' : ''}` 
+                    : 'Not broadcasting'}
+                </span>
+                {contact.phoneNumber && (
+                  <span className="text-xs flex items-center gap-1 text-muted-foreground">
+                    <Phone size={12} /> {contact.phoneNumber}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           
@@ -134,7 +141,14 @@ const ContactCard: React.FC<ContactCardProps> = ({
                   <div className="w-7 h-7 rounded-full bg-audio-light/80 text-audio-primary flex items-center justify-center">
                     <Headphones size={14} />
                   </div>
-                  <span>{listener.name}</span>
+                  <div className="flex flex-col">
+                    <span>{listener.name}</span>
+                    {listener.phoneNumber && (
+                      <span className="text-xs flex items-center gap-1 text-muted-foreground">
+                        <Phone size={10} /> {listener.phoneNumber}
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
