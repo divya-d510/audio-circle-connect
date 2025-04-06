@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Volume2, X, VolumeMinus, VolumePlus } from 'lucide-react';
+import { Volume2, X, Volume1, Volume } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import AudioWaveAnimation from '@/components/AudioWaveAnimation';
 
@@ -80,7 +80,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ onLeave, broadcaster }) => {
             size="icon"
             className="h-8 w-8 rounded-full hover:bg-white/20"
           >
-            <VolumeMinus size={16} />
+            <Volume size={16} />
           </Button>
           
           <input 
@@ -99,7 +99,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ onLeave, broadcaster }) => {
             size="icon"
             className="h-8 w-8 rounded-full hover:bg-white/20"
           >
-            <VolumePlus size={16} />
+            <Volume2 size={16} />
           </Button>
         </div>
         
