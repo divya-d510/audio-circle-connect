@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Header from '@/components/Header';
 import ContactsList from '@/components/ContactsList';
 import { useWebRTC } from '@/hooks/useWebRTC';
@@ -9,9 +9,10 @@ const Index = () => {
   const { 
     isBroadcasting, 
     isListening, 
-    toggleBroadcast, 
-    joinBroadcast,
+    currentBroadcaster,
     leaveBroadcast,
+    joinBroadcast,
+    toggleBroadcast,
     contacts,
     currentUser
   } = useWebRTC();
@@ -39,10 +40,10 @@ const Index = () => {
         />
       </main>
       
-      {isListening && (
+      {isListening && currentBroadcaster && (
         <AudioPlayer 
           onLeave={leaveBroadcast} 
-          broadcaster={contacts.find(c => c.id === currentUser.id)?.name || 'Unknown'}
+          broadcaster={contacts.find(c => c.id === currentBroadcaster)?.name || 'Unknown'}
         />
       )}
     </div>

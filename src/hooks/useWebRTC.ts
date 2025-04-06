@@ -24,6 +24,36 @@ export function useWebRTC() {
   const username = useState(() => `User-${userId.substring(0, 5)}`)[0];
   const phoneNumber = useState(() => generatePhoneNumber())[0];
   
+  // Define leaveBroadcast function before it's used in useEffect
+  const leaveBroadcast = useCallback(async () => {
+    if (!isListening || !currentBroadcaster) return false;
+    
+    try {
+      const webRTC = initializeWebRTC();
+      await webRTC.leaveBroadcast(currentBroadcaster);
+      
+      setIsListening(false);
+      setCurrentBroadcaster(null);
+      setCurrentRoomId(null);
+      
+      toast({
+        title: "Left broadcast",
+        description: "You are no longer listening",
+      });
+      
+      console.log("Left broadcast");
+      return true;
+    } catch (error) {
+      console.error("Error leaving broadcast:", error);
+      toast({
+        title: "Error",
+        description: "Failed to leave broadcast",
+        variant: "destructive",
+      });
+      return false;
+    }
+  }, [currentBroadcaster, isListening]);
+  
   const initializeWebRTC = useCallback((): WebRTCService => {
     const service = getWebRTCService(userId, username);
     
@@ -143,36 +173,6 @@ export function useWebRTC() {
       console.error('Error fetching listeners:', error);
     }
   }, [isBroadcasting, userId]);
-  
-  // Define leaveBroadcast function before it's used in useEffect
-  const leaveBroadcast = useCallback(async () => {
-    if (!isListening || !currentBroadcaster) return false;
-    
-    try {
-      const webRTC = initializeWebRTC();
-      await webRTC.leaveBroadcast(currentBroadcaster);
-      
-      setIsListening(false);
-      setCurrentBroadcaster(null);
-      setCurrentRoomId(null);
-      
-      toast({
-        title: "Left broadcast",
-        description: "You are no longer listening",
-      });
-      
-      console.log("Left broadcast");
-      return true;
-    } catch (error) {
-      console.error("Error leaving broadcast:", error);
-      toast({
-        title: "Error",
-        description: "Failed to leave broadcast",
-        variant: "destructive",
-      });
-      return false;
-    }
-  }, [currentBroadcaster, initializeWebRTC, isListening]);
   
   // Set up listeners for broadcast changes
   useEffect(() => {
@@ -312,7 +312,7 @@ export function useWebRTC() {
       }
       
       // If already listening to someone, leave first
-      if (isListening && currentBroadcaster) {
+      if (isListening) {
         // If trying to join the same broadcast, do nothing
         if (currentBroadcaster === contactId) {
           toast({
@@ -323,7 +323,15 @@ export function useWebRTC() {
         }
         
         // Leave current broadcast before joining a new one
-        await leaveBroadcast();
+        const leaveSuccess = await leaveBroadcast();
+        if (!leaveSuccess) {
+          toast({
+            title: "Error",
+            description: "Failed to leave current broadcast",
+            variant: "destructive",
+          });
+          return false;
+        }
       }
       
       const webRTC = initializeWebRTC();
@@ -356,7 +364,8 @@ export function useWebRTC() {
     name: username,
     phoneNumber: phoneNumber,
     isBroadcasting,
-    listeners: []
+    listeners: [],
+    roomId: currentRoomId
   };
   
   // Cleanup function for component unmount
